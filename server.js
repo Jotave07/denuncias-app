@@ -41,13 +41,15 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
+// Rota admin: renderiza com dados do banco via EJS
 app.get('/admin', (req, res) => {
   db.query('SELECT * FROM denuncias ORDER BY data_envio DESC', (err, results) => {
     if (err) return res.status(500).send('Erro ao buscar denúncias.');
 
     results.forEach(d => {
       if (d.data_envio) {
-        d.data_formatada = moment.utc(d.data_envio).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss');
+        const dataBr = moment.utc(d.data_envio).add(-3, 'hours'); // UTC → Brasília
+        d.data_formatada = dataBr.format('DD/MM/YYYY HH:mm:ss');
       } else {
         d.data_formatada = 'Data indisponível';
       }
@@ -56,6 +58,7 @@ app.get('/admin', (req, res) => {
     res.render('admin', { denuncias: results });
   });
 });
+
 
 
 // Envio de denúncia
