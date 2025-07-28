@@ -66,7 +66,6 @@ app.post('/submit-denuncia', upload.single('arquivo'), (req, res) => {
   const descricao = req.body.descricao;
   const identificacao = req.body.identificacao || 'Anônimo';
   const arquivo = req.file ? req.file.filename : null;
-
   const data_envio = moment.utc().tz('America/Sao_Paulo').format('DD-MM-YYYY HH:mm:ss');
 
   db.query(
