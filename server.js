@@ -5,7 +5,7 @@ const fs = require('fs');
 const basicAuth = require('express-basic-auth');
 const db = require('./db');
 const enviarEmail = require('./mailer');
-const moment = require('moment');
+const moment = require('moment-timezone'); // apenas esse!
 
 const app = express();
 
@@ -14,7 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Configurando EJS
 app.set('view engine', 'ejs');
-app.set('views', __dirname); // ou a pasta onde estiver admin.ejs
+app.set('views', __dirname);
 
 // Pasta para uploads
 const uploadsDir = './uploads';
@@ -47,7 +47,11 @@ app.get('/admin', (req, res) => {
     if (err) return res.status(500).send('Erro ao buscar denúncias.');
 
     results.forEach(d => {
-      d.data_formatada = moment(d.data_envio).format('DD/MM/YYYY HH:mm:ss');
+      if (d.data_envio) {
+        d.data_formatada = moment(d.data_envio).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss');
+      } else {
+        d.data_formatada = 'Data indisponível';
+      }
     });
 
     res.render('admin', { denuncias: results });
@@ -60,7 +64,6 @@ app.post('/submit-denuncia', upload.single('arquivo'), (req, res) => {
   const identificacao = req.body.identificacao || 'Anônimo';
   const arquivo = req.file ? req.file.filename : null;
 
-  // Data com fuso de São Paulo
   const data_envio = moment().tz('America/Sao_Paulo').format('YYYY-MM-DD HH:mm:ss');
 
   db.query(
@@ -78,7 +81,6 @@ app.post('/submit-denuncia', upload.single('arquivo'), (req, res) => {
     }
   );
 });
-
 
 // Atualizar status
 app.post('/admin/status/:id', (req, res) => {
