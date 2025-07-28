@@ -60,9 +60,12 @@ app.post('/submit-denuncia', upload.single('arquivo'), (req, res) => {
   const identificacao = req.body.identificacao || 'Anônimo';
   const arquivo = req.file ? req.file.filename : null;
 
+  // Data com fuso de São Paulo
+  const data_envio = moment().tz('America/Sao_Paulo').format('YYYY-MM-DD HH:mm:ss');
+
   db.query(
-    'INSERT INTO denuncias (descricao, identificacao, arquivo) VALUES (?, ?, ?)',
-    [descricao, identificacao, arquivo],
+    'INSERT INTO denuncias (descricao, identificacao, arquivo, data_envio) VALUES (?, ?, ?, ?)',
+    [descricao, identificacao, arquivo, data_envio],
     (err, results) => {
       if (err) {
         console.error('Erro ao inserir no banco:', err.message);
@@ -75,6 +78,7 @@ app.post('/submit-denuncia', upload.single('arquivo'), (req, res) => {
     }
   );
 });
+
 
 // Atualizar status
 app.post('/admin/status/:id', (req, res) => {
