@@ -5,7 +5,7 @@ const fs = require('fs');
 const basicAuth = require('express-basic-auth');
 const db = require('./db');
 const enviarEmail = require('./mailer');
-const moment = require('moment-timezone'); // apenas esse!
+const moment = require('moment-timezone');
 
 const app = express();
 
@@ -41,14 +41,13 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
-// Rota admin: renderiza com dados do banco via EJS
 app.get('/admin', (req, res) => {
   db.query('SELECT * FROM denuncias ORDER BY data_envio DESC', (err, results) => {
     if (err) return res.status(500).send('Erro ao buscar denúncias.');
 
     results.forEach(d => {
       if (d.data_envio) {
-        d.data_formatada = moment(d.data_envio).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss');
+        d.data_formatada = moment.utc(d.data_envio).tz('America/Sao_Paulo').format('DD/MM/YYYY HH:mm:ss');
       } else {
         d.data_formatada = 'Data indisponível';
       }
@@ -58,13 +57,14 @@ app.get('/admin', (req, res) => {
   });
 });
 
+
 // Envio de denúncia
 app.post('/submit-denuncia', upload.single('arquivo'), (req, res) => {
   const descricao = req.body.descricao;
   const identificacao = req.body.identificacao || 'Anônimo';
   const arquivo = req.file ? req.file.filename : null;
 
-  const data_envio = moment().tz('America/Sao_Paulo').format('YYYY-MM-DD HH:mm:ss');
+  const data_envio = moment.utc().tz('America/Sao_Paulo').format('YYYY-MM-DD HH:mm:ss');
 
   db.query(
     'INSERT INTO denuncias (descricao, identificacao, arquivo, data_envio) VALUES (?, ?, ?, ?)',
