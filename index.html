@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Denúncia Anônima | Novesete Distribuidora</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+
+  <div class="bg-white p-8 rounded shadow-md w-full max-w-lg">
+    <h1 class="text-3xl font-bold text-center text-blue-700 mb-6">
+      Novesete Distribuidora
+    </h1>
+
+    <h2 class="text-xl font-semibold text-center text-gray-800 mb-4">
+      Formulário de Denúncia Anônima
+    </h2>
+
+    <!-- MENSAGEM DE RETORNO -->
+    <p id="mensagem" class="text-center mb-4 text-sm font-semibold"></p>
+
+    <!-- FORMULÁRIO -->
+    <form id="denunciaForm" enctype="multipart/form-data" class="space-y-4">
+      <div>
+        <label class="block font-medium text-gray-700 mb-1">Descrição da Denúncia <span class="text-red-500">*</span></label>
+        <textarea name="descricao" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea>
+      </div>
+
+      <div>
+        <label class="block font-medium text-gray-700 mb-1">Identifique-se (opcional)</label>
+        <input type="text" name="identificacao" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+      </div>
+
+      <div>
+        <label class="block font-medium text-gray-700 mb-1">Anexar Arquivo</label>
+        <input type="file" name="arquivo" class="w-full text-gray-700" />
+      </div>
+
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded w-full transition">
+        Enviar Denúncia
+      </button>
+    </form>
+  </div>
+
+  <!-- SCRIPT -->
+  <script>
+    const form = document.getElementById('denunciaForm');
+    const mensagem = document.getElementById('mensagem');
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const formData = new FormData(form);
+
+      fetch('/submit-denuncia', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.text())
+      .then(data => {
+        mensagem.textContent = '✅ Denúncia registrada com sucesso!';
+        mensagem.className = 'text-green-600 text-center mb-4 text-sm font-semibold';
+        form.reset();
+
+        setTimeout(() => {
+          mensagem.textContent = '';
+        }, 5000);
+      })
+      .catch(err => {
+        mensagem.textContent = '❌ Erro ao enviar denúncia.';
+        mensagem.className = 'text-red-600 text-center mb-4 text-sm font-semibold';
+      });
+    });
+  </script>
+</body>
+</html>
