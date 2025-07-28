@@ -48,7 +48,7 @@ app.get('/admin', (req, res) => {
 
     results.forEach(d => {
       if (d.data_envio) {
-        const dataBr = moment.utc(d.data_envio).add(-3, 'hours'); // UTC → Brasília
+        const dataBr = moment.utc(d.data_envio); // UTC → Brasília
         d.data_formatada = dataBr.format('DD/MM/YYYY HH:mm:ss');
       } else {
         d.data_formatada = 'Data indisponível';
