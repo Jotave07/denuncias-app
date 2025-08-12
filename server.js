@@ -1,108 +1,172 @@
 const express = require('express');
-const multer = require('multer');
+const bodyParser = require('body-parser');
+const session = require('express-session');
 const path = require('path');
+const multer = require('multer');
 const fs = require('fs');
-const basicAuth = require('express-basic-auth');
 const db = require('./db');
 const enviarEmail = require('./mailer');
-const moment = require('moment-timezone');
 
 const app = express();
+const upload = multer({ dest: 'uploads/' });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
-// Configurando EJS
-app.set('view engine', 'ejs');
-app.set('views', __dirname);
-
-// Pasta para uploads
-const uploadsDir = './uploads';
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir);
-}
-app.use('/uploads', express.static('uploads'));
-
-// Protegendo o /admin com autenticação básica
-app.use('/admin', basicAuth({
-  users: { 'admin': 'novesete' },
-  challenge: true
+app.use(session({
+    secret: 'chave_secreta',
+    resave: false,
+    saveUninitialized: true
 }));
 
-// Configurando multer
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
-});
-const upload = multer({ storage });
+app.set('view engine', 'ejs');
+app.use(express.static('public'));
 
-// Rota pública: formulário
+// Rota para a página principal
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Rota admin: renderiza com dados do banco via EJS
+// Rota para o painel administrativo
 app.get('/admin', (req, res) => {
-  db.query('SELECT * FROM denuncias ORDER BY data_envio DESC', (err, results) => {
-    if (err) return res.status(500).send('Erro ao buscar denúncias.');
+    if (req.session.logado) {
+        // A query foi alterada para selecionar os novos campos de anexo
+        db.query('SELECT *, anexo_nome_original, anexo_nome_salvo FROM denuncias ORDER BY data_envio DESC', (err, results) => {
+            if (err) {
+                console.error('Erro ao buscar denúncias:', err);
+                return res.status(500).send('Erro ao buscar denúncias');
+            }
+            res.render('admin', { denuncias: results });
+        });
+    } else {
+        res.sendFile(path.join(__dirname, 'login.html'));
+    }
+});
 
-    results.forEach(d => {
-      if (d.data_envio) {
-        const dataBr = moment.utc(d.data_envio); // UTC → Brasília
-        d.data_formatada = dataBr.format('DD/MM/YYYY HH:mm:ss');
-      } else {
-        d.data_formatada = 'Data indisponível';
-      }
+// Rota para processar o login
+app.post('/login', (req, res) => {
+    const { usuario, senha } = req.body;
+    if (usuario === 'admin' && senha === '1234') {
+        req.session.logado = true;
+        res.redirect('/admin');
+    } else {
+        res.send('Credenciais inválidas');
+    }
+});
+
+// Rota para envio da denúncia
+app.post('/enviar', upload.single('anexo'), (req, res) => {
+    const { identificado, nome, telefone, email, tipo, descricao } = req.body;
+    const identificacao = identificado === 'sim';
+    const nomeFinal = identificacao ? nome || null : null;
+    const telefoneFinal = identificacao ? telefone || null : null;
+    const emailFinal = identificacao ? email || null : null;
+
+    // Novos campos para anexo
+    const anexoNomeOriginal = req.file ? req.file.originalname : null;
+    const anexoNomeSalvo = req.file ? req.file.filename : null;
+
+    const query = `
+        INSERT INTO denuncias (identificacao, nome, telefone, email, tipo, descricao, status, anexo_nome_original, anexo_nome_salvo, data_envio)
+        VALUES (?, ?, ?, ?, ?, ?, 'Pendente', ?, ?, NOW())
+    `;
+
+    db.query(query, [identificacao, nomeFinal, telefoneFinal, emailFinal, tipo, descricao, anexoNomeOriginal, anexoNomeSalvo], (err, result) => {
+        if (err) {
+            console.error('Erro ao salvar:', err);
+            return res.status(500).json({ message: 'Erro ao enviar denúncia.' });
+        }
+
+        const denunciaParaEmail = {
+            id: result.insertId,
+            descricao: descricao,
+            identificacao: identificacao ? 'Sim' : 'Não',
+            arquivo: anexoNomeOriginal // Usa o nome original para o e-mail
+        };
+        
+        enviarEmail(denunciaParaEmail);
+
+        // Não remove o anexo temporário, pois ele será usado para download.
+        // if (req.file) {
+        //     fs.unlink(req.file.path, () => {});
+        // }
+
+        res.json({ message: 'Denúncia enviada com sucesso!' });
     });
-
-    res.render('admin', { denuncias: results });
-  });
 });
 
-
-
-// Envio de denúncia
-app.post('/submit-denuncia', upload.single('arquivo'), (req, res) => {
-  const descricao = req.body.descricao;
-  const identificacao = req.body.identificacao || 'Anônimo';
-  const arquivo = req.file ? req.file.filename : null;
-  const data_envio = moment.utc().tz('America/Sao_Paulo').format('YYYY-MM-DD HH:mm:ss');
-
-  db.query(
-    'INSERT INTO denuncias (descricao, identificacao, arquivo, data_envio) VALUES (?, ?, ?, ?)',
-    [descricao, identificacao, arquivo, data_envio],
-    (err, results) => {
-      if (err) {
-        console.error('Erro ao inserir no banco:', err.message);
-        return res.status(500).send('Erro ao registrar denúncia.');
-      }
-
-      enviarEmail({ descricao, identificacao, arquivo });
-
-      res.send('Denúncia registrada com sucesso!');
+// Rota para marcar denúncia como resolvida
+app.post('/admin/marcar/:id/resolvido', (req, res) => {
+    if (!req.session.logado) {
+        return res.status(403).send('Acesso negado.');
     }
-  );
+
+    const denunciaId = req.params.id;
+    const query = 'UPDATE denuncias SET status = "Resolvido" WHERE id = ?';
+
+    db.query(query, [denunciaId], (err) => {
+        if (err) {
+            console.error('Erro ao atualizar status:', err);
+            return res.status(500).send('Erro ao atualizar o status da denúncia.');
+        }
+        
+        res.redirect('/admin');
+    });
 });
 
-// Atualizar status
-app.post('/admin/status/:id', (req, res) => {
-  const id = req.params.id;
-  const novoStatus = req.body.status;
-
-  db.query(
-    'UPDATE denuncias SET status = ? WHERE id = ?',
-    [novoStatus, id],
-    (err, result) => {
-      if (err) {
-        console.error('Erro ao atualizar status:', err.message);
-        return res.status(500).send('Erro ao atualizar denúncia.');
-      }
-      res.redirect('/admin');
+// Rota para marcar denúncia como pendente
+app.post('/admin/marcar/:id/pendente', (req, res) => {
+    if (!req.session.logado) {
+        return res.status(403).send('Acesso negado.');
     }
-  );
+
+    const denunciaId = req.params.id;
+    const query = 'UPDATE denuncias SET status = "Pendente" WHERE id = ?';
+
+    db.query(query, [denunciaId], (err) => {
+        if (err) {
+            console.error('Erro ao atualizar status:', err);
+            return res.status(500).send('Erro ao atualizar o status da denúncia.');
+        }
+        
+        res.redirect('/admin');
+    });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+// Nova rota para download de anexos
+app.get('/admin/anexo/:filename', (req, res) => {
+    if (!req.session.logado) {
+        return res.status(403).send('Acesso negado.');
+    }
+
+    const filename = req.params.filename;
+    const filePath = path.join(__dirname, 'uploads', filename);
+
+    // Consulta no banco de dados para obter o nome original
+    const query = 'SELECT anexo_nome_original FROM denuncias WHERE anexo_nome_salvo = ?';
+    db.query(query, [filename], (err, results) => {
+        if (err || results.length === 0) {
+            return res.status(404).send('Arquivo não encontrado ou erro no banco de dados.');
+        }
+        const originalname = results[0].anexo_nome_original;
+
+        // Envia o arquivo para download com o nome original
+        res.download(filePath, originalname, (err) => {
+            if (err) {
+                console.error('Erro ao enviar o arquivo para download:', err);
+                res.status(500).send('Erro ao fazer o download do arquivo.');
+            }
+        });
+    });
+});
+
+
+// Rota de logout
+app.get('/logout', (req, res) => {
+    req.session.destroy(() => res.redirect('/'));
+});
+
+// Iniciar o servidor
+app.listen(3000, () => {
+    console.log('Servidor rodando na porta 3000');
 });

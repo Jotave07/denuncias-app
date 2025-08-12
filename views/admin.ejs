@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel de Denúncias</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f9f9f9;
+            padding: 30px;
+        }
+        h2 {
+            display: flex;
+            align-items: center;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        h2::before {
+            content: '📋';
+            margin-right: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+        th, td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            background-color: #f3f3f3;
+            font-weight: 600;
+        }
+        .badge {
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: inline-block;
+        }
+        .resolvido {
+            background-color: #d1f4e0;
+            color: #0a8754;
+        }
+        .pendente {
+            background-color: #fce9d2;
+            color: #b15f00;
+        }
+        .btn-acao {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            color: white;
+        }
+        .btn-pendente {
+            background-color: #f0ad4e;
+        }
+        .btn-resolvido {
+            background-color: #28a745;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a.logout {
+            float: right;
+            text-decoration: underline;
+        }
+        /* Estilo para garantir que os botões de ação fiquem na mesma linha */
+        .action-cell {
+            display: flex;
+            gap: 5px; /* Adiciona um pequeno espaço entre os botões */
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Painel de Denúncias <a class="logout" href="/logout">[Sair]</a></h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Descrição</th>
+                <th>Identificação</th>
+                <th>Anexo</th>
+                <th>Data</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% denuncias.forEach(d => { %>
+                <tr>
+                    <td><%= d.id %></td>
+                    <td><%= d.descricao %></td>
+                    <td><%= d.nome ? d.nome : 'Anônimo' %></td>
+                    <td>
+                        <% if (d.anexo_nome_original) { %>
+                            <a href="/admin/anexo/<%= d.anexo_nome_salvo %>" target="_blank" title="<%= d.anexo_nome_original %>">
+                                <%= d.anexo_nome_original %>
+                            </a>
+                        <% } else { %>
+                            Nenhum
+                        <% } %>
+                    </td>
+                    <td><%= d.data_envio ? d.data_envio.toLocaleString('pt-BR') : 'Data indisponível' %></td>
+                    <td>
+                        <% if (d.status === 'Resolvido') { %>
+                            <span class="badge resolvido">Resolvido</span>
+                        <% } else { %>
+                            <span class="badge pendente">Pendente</span>
+                        <% } %>
+                    </td>
+                    <td>
+                        <% if (d.status === 'Resolvido') { %>
+                            <form method="POST" action="/admin/marcar/<%= d.id %>/pendente">
+                                <button type="submit" class="btn-acao btn-pendente">Marcar Pendente</button>
+                            </form>
+                        <% } else { %>
+                            <form method="POST" action="/admin/marcar/<%= d.id %>/resolvido">
+                                <button type="submit" class="btn-acao btn-resolvido">Marcar Resolvido</button>
+                            </form>
+                        <% } %>
+                    </td>
+                </tr>
+            <% }) %>
+        </tbody>
+    </table>
+
+</body>
+</html>
