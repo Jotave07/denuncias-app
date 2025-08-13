@@ -4,6 +4,7 @@ const session = require('express-session');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const bcrypt = require('bcrypt');
 const db = require('./db');
 const enviarEmail = require('./mailer');
 
@@ -21,16 +22,77 @@ app.use(session({
 
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'uploads')));
 
-// Rota para a página principal
+// Rota para a página principal (formulário de denúncia)
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Rota para a página de login
+app.get('/login', (req, res) => {
+    if (req.session.logado) {
+        return res.redirect('/admin');
+    }
+    res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+// Rota para a página de registro de administrador
+app.get('/register-admin', (req, res) => {
+    if (!req.session.logado) {
+        return res.redirect('/login');
+    }
+    res.render('register');
+});
+
+// Rota para processar o registro de um novo administrador
+app.post('/register-admin', async (req, res) => {
+    if (!req.session.logado) {
+        return res.status(403).send('Acesso negado.');
+    }
+
+    const { usuario, senha } = req.body;
+    try {
+        const hashedPassword = await bcrypt.hash(senha, 10);
+        const query = 'INSERT INTO administradores (usuario, senha) VALUES (?, ?)';
+        db.query(query, [usuario, hashedPassword], (err) => {
+            if (err) {
+                console.error('Erro ao registrar novo administrador:', err);
+                return res.status(500).send('Erro ao registrar administrador.');
+            }
+            res.redirect('/admin'); // Redireciona para o painel após o registro
+        });
+    } catch (error) {
+        res.status(500).send('Erro ao processar a senha.');
+    }
+});
+
+// Rota para processar o login
+app.post('/login', (req, res) => {
+    const { usuario, senha } = req.body;
+
+    const query = 'SELECT * FROM administradores WHERE usuario = ?';
+    db.query(query, [usuario], async (err, results) => {
+        if (err) {
+            console.error('Erro ao buscar usuário:', err);
+            return res.status(500).send('Erro no servidor.');
+        }
+
+        if (results.length > 0) {
+            const admin = results[0];
+            const match = await bcrypt.compare(senha, admin.senha);
+            if (match) {
+                req.session.logado = true;
+                return res.redirect('/admin');
+            }
+        }
+        res.send('Credenciais inválidas.');
+    });
 });
 
 // Rota para o painel administrativo
 app.get('/admin', (req, res) => {
     if (req.session.logado) {
-        // A query foi alterada para selecionar os novos campos de anexo
         db.query('SELECT *, anexo_nome_original, anexo_nome_salvo FROM denuncias ORDER BY data_envio DESC', (err, results) => {
             if (err) {
                 console.error('Erro ao buscar denúncias:', err);
@@ -39,18 +101,7 @@ app.get('/admin', (req, res) => {
             res.render('admin', { denuncias: results });
         });
     } else {
-        res.sendFile(path.join(__dirname, 'login.html'));
-    }
-});
-
-// Rota para processar o login
-app.post('/login', (req, res) => {
-    const { usuario, senha } = req.body;
-    if (usuario === 'admin' && senha === '1234') {
-        req.session.logado = true;
-        res.redirect('/admin');
-    } else {
-        res.send('Credenciais inválidas');
+        res.redirect('/login');
     }
 });
 
@@ -62,7 +113,6 @@ app.post('/enviar', upload.single('anexo'), (req, res) => {
     const telefoneFinal = identificacao ? telefone || null : null;
     const emailFinal = identificacao ? email || null : null;
 
-    // Novos campos para anexo
     const anexoNomeOriginal = req.file ? req.file.originalname : null;
     const anexoNomeSalvo = req.file ? req.file.filename : null;
 
@@ -81,15 +131,10 @@ app.post('/enviar', upload.single('anexo'), (req, res) => {
             id: result.insertId,
             descricao: descricao,
             identificacao: identificacao ? 'Sim' : 'Não',
-            arquivo: anexoNomeOriginal // Usa o nome original para o e-mail
+            arquivo: anexoNomeOriginal
         };
         
         enviarEmail(denunciaParaEmail);
-
-        // Não remove o anexo temporário, pois ele será usado para download.
-        // if (req.file) {
-        //     fs.unlink(req.file.path, () => {});
-        // }
 
         res.json({ message: 'Denúncia enviada com sucesso!' });
     });
@@ -133,7 +178,7 @@ app.post('/admin/marcar/:id/pendente', (req, res) => {
     });
 });
 
-// Nova rota para download de anexos
+// Rota para download de anexos
 app.get('/admin/anexo/:filename', (req, res) => {
     if (!req.session.logado) {
         return res.status(403).send('Acesso negado.');
@@ -142,7 +187,6 @@ app.get('/admin/anexo/:filename', (req, res) => {
     const filename = req.params.filename;
     const filePath = path.join(__dirname, 'uploads', filename);
 
-    // Consulta no banco de dados para obter o nome original
     const query = 'SELECT anexo_nome_original FROM denuncias WHERE anexo_nome_salvo = ?';
     db.query(query, [filename], (err, results) => {
         if (err || results.length === 0) {
@@ -150,7 +194,6 @@ app.get('/admin/anexo/:filename', (req, res) => {
         }
         const originalname = results[0].anexo_nome_original;
 
-        // Envia o arquivo para download com o nome original
         res.download(filePath, originalname, (err) => {
             if (err) {
                 console.error('Erro ao enviar o arquivo para download:', err);
@@ -160,13 +203,11 @@ app.get('/admin/anexo/:filename', (req, res) => {
     });
 });
 
-
 // Rota de logout
 app.get('/logout', (req, res) => {
     req.session.destroy(() => res.redirect('/'));
 });
 
-// Iniciar o servidor
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
     console.log(`Servidor rodando na porta ${port}`);

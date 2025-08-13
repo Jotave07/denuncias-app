@@ -1,5 +1,28 @@
 const mysql = require('mysql2');
 
+const db = mysql.createConnection({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT || 3306
+});
+
+db.connect((err) => {
+    if (err) {
+        console.error('Erro ao conectar ao MySQL:', err.message);
+        return;
+    }
+    console.log('Conexão com o banco de dados MySQL estabelecida!');
+});
+
+module.exports = db;
+
+
+
+
+/*const mysql = require('mysql2');
+
 // Altere essas credenciais conforme seu ambiente
 const connection = mysql.createConnection({
   host: '65.109.171.110',
@@ -17,7 +40,7 @@ connection.connect((err) => {
   console.log('Conectado ao MySQL com sucesso!');
 });
 
-module.exports = connection;
+module.exports = connection;*/
 
 
 /*const mysql = require('mysql2');
