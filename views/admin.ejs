@@ -36,11 +36,14 @@
             max-height: 90vh;
             overflow-y: auto;
         }
+        /* Estilo para a caixa de motivo da resolução */
+        #resolutionModal .modal-content {
+            max-width: 450px;
+        }
     </style>
 </head>
 <body class="bg-gray-100 p-4 md:p-8">
 
-    <!-- Alterado o contêiner principal para se ajustar à largura total com padding -->
     <div class="w-full bg-white rounded-lg shadow-xl p-6 md:p-8">
         <header class="flex flex-col md:flex-row justify-between items-center mb-6 md:mb-8 border-b pb-4">
             <h1 class="text-3xl font-bold text-gray-800">Painel Administrativo</h1>
@@ -50,7 +53,6 @@
             </div>
         </header>
 
-        <!-- Lógica para exibir a mensagem -->
         <% if (message) { %>
             <div class="px-4 py-3 rounded relative mb-4 <%= message.type === 'success' ? 'bg-green-100 border border-green-400 text-green-700' : 'bg-red-100 border border-red-400 text-red-700' %>" role="alert">
                 <span class="block sm:inline"><%= message.text %></span>
@@ -70,6 +72,8 @@
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anexo</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                            <!-- Nova coluna para o motivo da resolução -->
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Motivo da Resolução</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                         </tr>
                     </thead>
@@ -86,7 +90,8 @@
                             data-identificacao="<%= denuncia.identificacao ? 'true' : 'false' %>"
                             data-nome="<%= denuncia.nome || '' %>"
                             data-telefone="<%= denuncia.telefone || '' %>"
-                            data-email="<%= denuncia.email || '' %>">
+                            data-email="<%= denuncia.email || '' %>"
+                            data-motivo-resolucao="<%= denuncia.motivo_resolucao || '' %>">
                             <td class="px-6 py-4 whitespace-nowrap"><%= denuncia.id %></td>
                             <td class="px-6 py-4 whitespace-nowrap"><%= denuncia.tipo %></td>
                             <td class="px-6 py-4 whitespace-nowrap"><%= denuncia.status %></td>
@@ -100,14 +105,17 @@
                                 Nenhum
                                 <% } %>
                             </td>
-                            <!-- Formatação da data para o formato brasileiro -->
                             <td class="px-6 py-4 whitespace-nowrap"><%= new Date(denuncia.data_envio).toLocaleDateString('pt-BR') %></td>
+                            <!-- Célula para exibir o motivo da resolução -->
+                            <td class="px-6 py-4 truncate max-w-xs"><%= denuncia.motivo_resolucao || 'N/A' %></td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <form action="/admin/marcar/<%= denuncia.id %>/<%= denuncia.status === 'Pendente' ? 'resolvido' : 'pendente' %>" method="POST" class="inline-block" onclick="event.stopPropagation()">
-                                    <button type="submit" class="px-2 py-1 text-sm rounded-md <%= denuncia.status === 'Pendente' ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-yellow-500 text-white hover:bg-yellow-600' %>">
-                                        <%= denuncia.status === 'Pendente' ? 'Resolver' : 'Reabrir' %>
+                                <% if (denuncia.status === 'Pendente') { %>
+                                    <button type="button" onclick="showResolutionModal('<%= denuncia.id %>')" class="px-2 py-1 text-sm rounded-md bg-green-500 text-white hover:bg-green-600 transition duration-150 ease-in-out">
+                                        Resolver
                                     </button>
-                                </form>
+                                <% } else { %>
+                                    <span class="px-2 py-1 text-sm rounded-md bg-gray-300 text-gray-700">Resolvido</span>
+                                <% } %>
                             </td>
                         </tr>
                         <% }); %>
@@ -120,7 +128,7 @@
         </main>
     </div>
 
-    <!-- Modal para exibir os detalhes da denúncia -->
+    <!-- Modal para exibir os detalhes da denúncia (alterado para incluir o motivo) -->
     <div id="denunciaModal" class="modal">
         <div class="modal-content">
             <span class="absolute top-4 right-4 text-gray-500 text-2xl font-bold cursor-pointer" onclick="closeDenunciaModal()">&times;</span>
@@ -130,6 +138,8 @@
                 <p><strong>Tipo:</strong> <span id="modal-tipo"></span></p>
                 <p><strong>Status:</strong> <span id="modal-status"></span></p>
                 <p><strong>Descrição:</strong> <span id="modal-descricao" class="block mt-1 p-2 bg-gray-100 rounded-md break-words" style="white-space: pre-wrap;"></span></p>
+                <!-- Novo campo no modal para exibir o motivo -->
+                <p><strong>Motivo da Resolução:</strong> <span id="modal-motivo-resolucao" class="block mt-1 p-2 bg-gray-100 rounded-md break-words" style="white-space: pre-wrap;"></span></p>
                 <p><strong>Anexo:</strong> <span id="modal-anexo"></span></p>
                 <p><strong>Data:</strong> <span id="modal-data"></span></p>
                 <div id="modal-identificacao">
@@ -144,7 +154,28 @@
         </div>
     </div>
 
+    <!-- Modal para a resolução da denúncia (sem alteração) -->
+    <div id="resolutionModal" class="modal">
+        <div class="modal-content">
+            <span class="absolute top-4 right-4 text-gray-500 text-2xl font-bold cursor-pointer" onclick="closeResolutionModal()">&times;</span>
+            <h3 class="text-2xl font-semibold mb-4 text-center">Resolver Denúncia</h3>
+            <p class="mb-4 text-center text-gray-600">Tem certeza que deseja resolver esta denúncia? Esta ação não pode ser desfeita.</p>
+            <div class="space-y-4">
+                <div>
+                    <label for="resolution-reason" class="block text-sm font-medium text-gray-700 mb-1">Motivo da resolução</label>
+                    <textarea id="resolution-reason" rows="4" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Digite o motivo da resolução..."></textarea>
+                </div>
+                <input type="hidden" id="resolution-denuncia-id">
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button type="button" onclick="closeResolutionModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition duration-150 ease-in-out">Cancelar</button>
+                <button type="button" id="confirmResolutionBtn" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-150 ease-in-out">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Função para mostrar o modal de detalhes da denúncia
         document.getElementById('denuncias-tabela').addEventListener('click', function(event) {
             const row = event.target.closest('tr');
             if (row) {
@@ -159,7 +190,8 @@
                     identificacao: row.dataset.identificacao === 'true',
                     nome: row.dataset.nome,
                     telefone: row.dataset.telefone,
-                    email: row.dataset.email
+                    email: row.dataset.email,
+                    motivo_resolucao: row.dataset.motivoResolucao // Adicionado o novo campo aqui
                 };
                 showDenunciaModal(denuncia);
             }
@@ -173,8 +205,15 @@
             document.getElementById('modal-status').textContent = denuncia.status;
             document.getElementById('modal-descricao').textContent = denuncia.descricao;
             
+            // Exibe o motivo da resolução ou uma mensagem padrão se não houver
+            const motivoResolucaoSpan = document.getElementById('modal-motivo-resolucao');
+            if (denuncia.status === 'Resolvido' && denuncia.motivo_resolucao) {
+                motivoResolucaoSpan.textContent = denuncia.motivo_resolucao;
+            } else {
+                motivoResolucaoSpan.textContent = 'Denúncia não resolvida.';
+            }
+
             if (denuncia.data_envio) {
-                // Formatação da data para o formato brasileiro no modal
                 document.getElementById('modal-data').textContent = new Date(denuncia.data_envio).toLocaleDateString('pt-BR');
             } else {
                 document.getElementById('modal-data').textContent = 'Data não disponível';
@@ -201,17 +240,67 @@
             modal.style.display = 'flex';
         }
 
-        // Função para fechar o modal
         function closeDenunciaModal() {
             const modal = document.getElementById('denunciaModal');
             modal.style.display = 'none';
         }
 
+        // Funções para o novo modal de resolução
+        function showResolutionModal(denunciaId) {
+            const modal = document.getElementById('resolutionModal');
+            document.getElementById('resolution-denuncia-id').value = denunciaId;
+            modal.style.display = 'flex';
+        }
+
+        function closeResolutionModal() {
+            const modal = document.getElementById('resolutionModal');
+            modal.style.display = 'none';
+        }
+
+        document.getElementById('confirmResolutionBtn').addEventListener('click', async function() {
+            const denunciaId = document.getElementById('resolution-denuncia-id').value;
+            const reason = document.getElementById('resolution-reason').value;
+
+            // Validação simples
+            if (reason.trim() === '') {
+                alert('O motivo da resolução é obrigatório.');
+                return;
+            }
+
+            try {
+                // Requisição para a API (Endpoint hipotético, assumindo que você criará um)
+                const response = await fetch(`/admin/resolver/${denunciaId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ reason: reason })
+                });
+
+                if (response.ok) {
+                    alert('Denúncia resolvida com sucesso!');
+                    window.location.reload(); // Recarrega a página para atualizar a tabela
+                } else {
+                    const error = await response.json();
+                    alert(`Erro ao resolver denúncia: ${error.message}`);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Ocorreu um erro ao tentar resolver a denúncia. Tente novamente.');
+            } finally {
+                closeResolutionModal();
+            }
+        });
+
         // Fecha o modal se o usuário clicar fora dele
         window.onclick = function(event) {
-            const modal = document.getElementById('denunciaModal');
-            if (event.target === modal) {
-                modal.style.display = 'none';
+            const denunciaModal = document.getElementById('denunciaModal');
+            const resolutionModal = document.getElementById('resolutionModal');
+            if (event.target === denunciaModal) {
+                denunciaModal.style.display = 'none';
+            }
+            if (event.target === resolutionModal) {
+                resolutionModal.style.display = 'none';
             }
         }
     </script>

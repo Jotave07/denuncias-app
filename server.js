@@ -41,7 +41,6 @@ app.get('/login', (req, res) => {
     if (req.session.logado) {
         return res.redirect('/admin');
     }
-    // A página de login agora é login.ejs, então renderizamos
     res.render('login');
 });
 
@@ -109,7 +108,8 @@ app.post('/login', (req, res) => {
 // Rota para o painel administrativo
 app.get('/admin', (req, res) => {
     if (req.session.logado) {
-        db.query('SELECT *, anexo_nome_original, anexo_nome_salvo FROM denuncias ORDER BY data_envio DESC', (err, results) => {
+        // Agora a consulta SQL inclui a nova coluna 'motivo_resolucao'
+        db.query('SELECT *, anexo_nome_original, anexo_nome_salvo, motivo_resolucao FROM denuncias ORDER BY data_envio DESC', (err, results) => {
             if (err) {
                 console.error('Erro ao buscar denúncias:', err);
                 return res.status(500).send('Erro ao buscar denúncias');
@@ -157,47 +157,41 @@ app.post('/enviar', upload.single('anexo'), (req, res) => {
     });
 });
 
-// Rota para marcar denúncia como resolvida
-app.post('/admin/marcar/:id/resolvido', (req, res) => {
+// ----- INÍCIO DA ALTERAÇÃO -----
+
+// Nova rota POST para resolver denúncias
+app.post('/admin/resolver/:id', (req, res) => {
     if (!req.session.logado) {
-        req.session.message = { text: 'Acesso negado.', type: 'error' };
-        return res.status(403).redirect('/login');
+        return res.status(403).json({ success: false, message: 'Acesso negado.' });
     }
 
     const denunciaId = req.params.id;
-    const query = 'UPDATE denuncias SET status = "Resolvido" WHERE id = ?';
+    const { reason } = req.body;
 
-    db.query(query, [denunciaId], (err) => {
-        if (err) {
-            console.error('Erro ao atualizar status:', err);
-            req.session.message = { text: 'Erro ao atualizar o status da denúncia.', type: 'error' };
-            return res.status(500).redirect('/admin');
-        }
-        req.session.message = { text: `Denúncia #${denunciaId} marcada como resolvida.`, type: 'success' };
-        res.redirect('/admin');
-    });
-});
-
-// Rota para marcar denúncia como pendente
-app.post('/admin/marcar/:id/pendente', (req, res) => {
-    if (!req.session.logado) {
-        req.session.message = { text: 'Acesso negado.', type: 'error' };
-        return res.status(403).redirect('/login');
+    if (!reason) {
+        return res.status(400).json({ success: false, message: 'O motivo da resolução é obrigatório.' });
     }
 
-    const denunciaId = req.params.id;
-    const query = 'UPDATE denuncias SET status = "Pendente" WHERE id = ?';
-
-    db.query(query, [denunciaId], (err) => {
+    // A consulta SQL agora atualiza o status E o motivo da resolução
+    const query = 'UPDATE denuncias SET status = "Resolvido", motivo_resolucao = ? WHERE id = ?';
+    db.query(query, [reason, denunciaId], (err, result) => {
         if (err) {
-            console.error('Erro ao atualizar status:', err);
-            req.session.message = { text: 'Erro ao atualizar o status da denúncia.', type: 'error' };
-            return res.status(500).redirect('/admin');
+            console.error('Erro ao atualizar status e motivo:', err);
+            return res.status(500).json({ success: false, message: 'Erro ao atualizar o status da denúncia.' });
         }
-        req.session.message = { text: `Denúncia #${denunciaId} marcada como pendente.`, type: 'success' };
-        res.redirect('/admin');
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Denúncia não encontrada.' });
+        }
+
+        // Resposta de sucesso para o frontend (JSON, em vez de redirect)
+        res.json({ success: true, message: `Denúncia #${denunciaId} marcada como resolvida.` });
     });
 });
+
+// As rotas antigas de marcar como 'resolvido' e 'pendente' foram removidas
+// porque a nova lógica do frontend e backend trata a resolução como uma ação final.
+
+// ----- FIM DA ALTERAÇÃO -----
 
 // Rota para download de anexos
 app.get('/admin/anexo/:filename', (req, res) => {
