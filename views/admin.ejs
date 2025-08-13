@@ -33,15 +33,15 @@
             width: 90%;
             max-width: 600px;
             position: relative;
-            /* Adicionado para permitir que a altura se ajuste ao conteúdo */
-            max-height: 90vh; /* Limite a altura máxima do modal para evitar que ele saia da tela */
-            overflow-y: auto; /* Adiciona scroll ao modal inteiro se o conteúdo for muito grande */
+            max-height: 90vh;
+            overflow-y: auto;
         }
     </style>
 </head>
 <body class="bg-gray-100 p-4 md:p-8">
 
-    <div class="max-w-7xl mx-auto bg-white rounded-lg shadow-xl p-6 md:p-8">
+    <!-- Alterado o contêiner principal para se ajustar à largura total com padding -->
+    <div class="w-full bg-white rounded-lg shadow-xl p-6 md:p-8">
         <header class="flex flex-col md:flex-row justify-between items-center mb-6 md:mb-8 border-b pb-4">
             <h1 class="text-3xl font-bold text-gray-800">Painel Administrativo</h1>
             <div class="flex flex-col sm:flex-row items-center gap-4 mt-4 md:mt-0">
@@ -100,7 +100,8 @@
                                 Nenhum
                                 <% } %>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap"><%= new Date(denuncia.data_envio).toLocaleDateString() %></td>
+                            <!-- Formatação da data para o formato brasileiro -->
+                            <td class="px-6 py-4 whitespace-nowrap"><%= new Date(denuncia.data_envio).toLocaleDateString('pt-BR') %></td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <form action="/admin/marcar/<%= denuncia.id %>/<%= denuncia.status === 'Pendente' ? 'resolvido' : 'pendente' %>" method="POST" class="inline-block" onclick="event.stopPropagation()">
                                     <button type="submit" class="px-2 py-1 text-sm rounded-md <%= denuncia.status === 'Pendente' ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-yellow-500 text-white hover:bg-yellow-600' %>">
@@ -128,7 +129,6 @@
                 <p><strong>ID:</strong> <span id="modal-id"></span></p>
                 <p><strong>Tipo:</strong> <span id="modal-tipo"></span></p>
                 <p><strong>Status:</strong> <span id="modal-status"></span></p>
-                <!-- Adicionado a classe break-words para quebrar palavras longas -->
                 <p><strong>Descrição:</strong> <span id="modal-descricao" class="block mt-1 p-2 bg-gray-100 rounded-md break-words" style="white-space: pre-wrap;"></span></p>
                 <p><strong>Anexo:</strong> <span id="modal-anexo"></span></p>
                 <p><strong>Data:</strong> <span id="modal-data"></span></p>
@@ -174,7 +174,8 @@
             document.getElementById('modal-descricao').textContent = denuncia.descricao;
             
             if (denuncia.data_envio) {
-                document.getElementById('modal-data').textContent = new Date(denuncia.data_envio).toLocaleDateString();
+                // Formatação da data para o formato brasileiro no modal
+                document.getElementById('modal-data').textContent = new Date(denuncia.data_envio).toLocaleDateString('pt-BR');
             } else {
                 document.getElementById('modal-data').textContent = 'Data não disponível';
             }
