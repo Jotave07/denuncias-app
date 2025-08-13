@@ -24,6 +24,13 @@ app.set('view engine', 'ejs');
 app.use(express.static('public'));
 app.use(express.static(path.join(__dirname, 'uploads')));
 
+// Middleware para passar mensagens da sessao para o template
+app.use((req, res, next) => {
+    res.locals.message = req.session.message;
+    delete req.session.message;
+    next();
+});
+
 // Rota para a página principal (formulário de denúncia)
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -34,7 +41,8 @@ app.get('/login', (req, res) => {
     if (req.session.logado) {
         return res.redirect('/admin');
     }
-    res.sendFile(path.join(__dirname, 'login.html'));
+    // A página de login agora é login.ejs, então renderizamos
+    res.render('login');
 });
 
 // Rota para a página de registro de administrador
@@ -48,7 +56,8 @@ app.get('/register-admin', (req, res) => {
 // Rota para processar o registro de um novo administrador
 app.post('/register-admin', async (req, res) => {
     if (!req.session.logado) {
-        return res.status(403).send('Acesso negado.');
+        req.session.message = { text: 'Acesso negado para registrar um novo administrador.', type: 'error' };
+        return res.status(403).redirect('/login');
     }
 
     const { usuario, senha } = req.body;
@@ -58,12 +67,16 @@ app.post('/register-admin', async (req, res) => {
         db.query(query, [usuario, hashedPassword], (err) => {
             if (err) {
                 console.error('Erro ao registrar novo administrador:', err);
-                return res.status(500).send('Erro ao registrar administrador.');
+                req.session.message = { text: 'Erro ao registrar administrador. Tente novamente.', type: 'error' };
+                return res.redirect('/register-admin');
             }
-            res.redirect('/admin'); // Redireciona para o painel após o registro
+            req.session.message = { text: `Administrador ${usuario} registrado com sucesso!`, type: 'success' };
+            res.redirect('/admin');
         });
     } catch (error) {
-        res.status(500).send('Erro ao processar a senha.');
+        console.error('Erro ao processar a senha:', error);
+        req.session.message = { text: 'Erro ao processar a senha.', type: 'error' };
+        res.redirect('/register-admin');
     }
 });
 
@@ -75,7 +88,8 @@ app.post('/login', (req, res) => {
     db.query(query, [usuario], async (err, results) => {
         if (err) {
             console.error('Erro ao buscar usuário:', err);
-            return res.status(500).send('Erro no servidor.');
+            req.session.message = { text: 'Erro no servidor, tente novamente.', type: 'error' };
+            return res.status(500).redirect('/login');
         }
 
         if (results.length > 0) {
@@ -83,10 +97,12 @@ app.post('/login', (req, res) => {
             const match = await bcrypt.compare(senha, admin.senha);
             if (match) {
                 req.session.logado = true;
+                req.session.message = { text: 'Login realizado com sucesso!', type: 'success' };
                 return res.redirect('/admin');
             }
         }
-        res.send('Credenciais inválidas.');
+        req.session.message = { text: 'Credenciais inválidas.', type: 'error' };
+        res.redirect('/login');
     });
 });
 
@@ -98,9 +114,10 @@ app.get('/admin', (req, res) => {
                 console.error('Erro ao buscar denúncias:', err);
                 return res.status(500).send('Erro ao buscar denúncias');
             }
-            res.render('admin', { denuncias: results });
+            res.render('admin', { denuncias: results, message: res.locals.message });
         });
     } else {
+        req.session.message = { text: 'Acesso negado. Por favor, faça login.', type: 'error' };
         res.redirect('/login');
     }
 });
@@ -143,7 +160,8 @@ app.post('/enviar', upload.single('anexo'), (req, res) => {
 // Rota para marcar denúncia como resolvida
 app.post('/admin/marcar/:id/resolvido', (req, res) => {
     if (!req.session.logado) {
-        return res.status(403).send('Acesso negado.');
+        req.session.message = { text: 'Acesso negado.', type: 'error' };
+        return res.status(403).redirect('/login');
     }
 
     const denunciaId = req.params.id;
@@ -152,9 +170,10 @@ app.post('/admin/marcar/:id/resolvido', (req, res) => {
     db.query(query, [denunciaId], (err) => {
         if (err) {
             console.error('Erro ao atualizar status:', err);
-            return res.status(500).send('Erro ao atualizar o status da denúncia.');
+            req.session.message = { text: 'Erro ao atualizar o status da denúncia.', type: 'error' };
+            return res.status(500).redirect('/admin');
         }
-        
+        req.session.message = { text: `Denúncia #${denunciaId} marcada como resolvida.`, type: 'success' };
         res.redirect('/admin');
     });
 });
@@ -162,7 +181,8 @@ app.post('/admin/marcar/:id/resolvido', (req, res) => {
 // Rota para marcar denúncia como pendente
 app.post('/admin/marcar/:id/pendente', (req, res) => {
     if (!req.session.logado) {
-        return res.status(403).send('Acesso negado.');
+        req.session.message = { text: 'Acesso negado.', type: 'error' };
+        return res.status(403).redirect('/login');
     }
 
     const denunciaId = req.params.id;
@@ -171,9 +191,10 @@ app.post('/admin/marcar/:id/pendente', (req, res) => {
     db.query(query, [denunciaId], (err) => {
         if (err) {
             console.error('Erro ao atualizar status:', err);
-            return res.status(500).send('Erro ao atualizar o status da denúncia.');
+            req.session.message = { text: 'Erro ao atualizar o status da denúncia.', type: 'error' };
+            return res.status(500).redirect('/admin');
         }
-        
+        req.session.message = { text: `Denúncia #${denunciaId} marcada como pendente.`, type: 'success' };
         res.redirect('/admin');
     });
 });
