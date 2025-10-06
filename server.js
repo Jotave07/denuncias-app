@@ -108,7 +108,6 @@ app.post('/login', (req, res) => {
 // Rota para o painel administrativo
 app.get('/admin', (req, res) => {
     if (req.session.logado) {
-        // Agora a consulta SQL inclui a nova coluna 'motivo_resolucao'
         db.query('SELECT *, anexo_nome_original, anexo_nome_salvo, motivo_resolucao FROM denuncias ORDER BY data_envio DESC', (err, results) => {
             if (err) {
                 console.error('Erro ao buscar denúncias:', err);
