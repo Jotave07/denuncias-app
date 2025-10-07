@@ -1,11 +1,15 @@
 const nodemailer = require('nodemailer');
 
-// Substitua pelos seus dados
+const resendApiKey = 're_gdcsTonW_2eC1ZmtmkvMYnmcxfXvJ8pTx'; 
+
+
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: "smtp.resend.com",
+  port: 465,
+  secure: true,
   auth: {
-    user: 'enviosdenuncia@gmail.com',
-    pass: 'vjevskoryuahscuq'
+    user: "resend", // sempre "resend"
+    pass: resendApiKey
   }
 });
 
@@ -34,3 +38,7 @@ function enviarEmail(denuncia) {
 }
 
 module.exports = enviarEmail;
+
+
+
+
