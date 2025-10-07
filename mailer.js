@@ -6,7 +6,7 @@ const resend = new Resend(process.env.RESEND_API_KEY || 're_gdcsTonW_2eC1ZmtmkvM
 async function enviarEmail(denuncia) {
   try {
     const data = await resend.emails.send({
-      from: 'Sistema de Denúncias <enviosdenuncia@gmail.com>',
+      from: 'Sistema de Denúncias <onboarding@resend.dev>',
       to: ['jvitor071298@gmail.com'],
       subject: 'Nova denúncia registrada',
       html: `
