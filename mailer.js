@@ -17,7 +17,7 @@ const transporter = nodemailer.createTransport({
 function enviarEmail(denuncia) {
   const mailOptions = {
     from: 'Sistema de Denúncias <enviosdenuncia@gmail.com>',
-    to: 'rh@novesete.com.br',
+    to: 'jvitor071298@gmail.com',
     subject: 'Nova denúncia registrada',
     html: `
       <h2>Nova denúncia recebida</h2>
