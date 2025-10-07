@@ -7,7 +7,7 @@ async function enviarEmail(denuncia) {
   try {
     const data = await resend.emails.send({
       from: 'Sistema de Denúncias <enviosdenuncia@novesete.com.br>',
-      to: ['jvitor071298@gmail.com'],
+      to: ['rh@novesete.com.br'],
       subject: 'Nova denúncia registrada',
       html: `
         <h2>Nova denúncia recebida</h2>
